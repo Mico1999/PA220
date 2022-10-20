@@ -1,8 +1,10 @@
-DROP TABLE if EXISTS Status;
+-- Marek Miček, 540461
+-- Peter Rúček, 540454
 
+DROP TABLE IF EXISTS Status;
 
 CREATE TABLE Status (
-   status_key BIGSERIAL PRIMARY KEY,
+   id BIGSERIAL PRIMARY KEY,
    car_key bigint, 
    "time" timestamp with time zone,
    app_run_time numeric(6,2),
@@ -15,4 +17,4 @@ INSERT INTO Status(car_key, "time", app_run_time, pda_run_time, tracking_mode, b
 SELECT car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level
 FROM pa220_data;
 
-SELECT count(status_key) FROM Status;
+SELECT count(id) FROM Status;
