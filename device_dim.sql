@@ -13,7 +13,7 @@
 DROP TABLE IF EXISTS Device;
 
 CREATE TABLE Device(
-    id BIGSERIAL PRIMARY KEY,
+    device_id BIGSERIAL PRIMARY KEY,
     device text,
     program_ver character varying(6)
 );

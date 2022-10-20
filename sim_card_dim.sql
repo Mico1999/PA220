@@ -5,7 +5,7 @@ DROP TABLE IF EXISTS Sim_Card;
 
 
 CREATE TABLE Sim_Card (
-    id BIGSERIAL PRIMARY KEY,
+    sim_card_id BIGSERIAL PRIMARY KEY,
     sim_imsi character(15),
     gsmnet_id character varying(6)
 );
@@ -14,7 +14,4 @@ INSERT INTO Sim_Card(sim_imsi, gsmnet_id)
 SELECT sim_imsi, gsmnet_id
 FROM pa220_data;
 
-SELECT count(id) FROM Sim_Card;
-
---SELECT * FROM Sim_Card
---WHERE sim_card_key < 10;
+SELECT * FROM Sim_Card FETCH FIRST 100 ROWS ONLY;

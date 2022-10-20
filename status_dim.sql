@@ -4,7 +4,7 @@
 DROP TABLE IF EXISTS Status;
 
 CREATE TABLE Status (
-   id BIGSERIAL PRIMARY KEY,
+   status_id BIGSERIAL PRIMARY KEY,
    car_key bigint, 
    "time" timestamp with time zone,
    app_run_time numeric(6,2),
@@ -17,4 +17,4 @@ INSERT INTO Status(car_key, "time", app_run_time, pda_run_time, tracking_mode, b
 SELECT car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level
 FROM pa220_data;
 
-SELECT count(id) FROM Status;
+SELECT * FROM Status FETCH FIRST 100 ROWS ONLY;

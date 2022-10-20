@@ -4,7 +4,7 @@
 DROP TABLE IF EXISTS Time;
 
 CREATE TABLE Time(
-    id BIGSERIAL PRIMARY KEY,
+    time_id BIGSERIAL PRIMARY KEY,
     year numeric,
     month numeric,
     day numeric,
