@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS Time;
 
 CREATE TABLE Time(
     time_id BIGSERIAL PRIMARY KEY,
+    whole timestamp with time zone,
     year numeric,
     month numeric,
     day numeric,
@@ -14,8 +15,9 @@ CREATE TABLE Time(
     timezone numeric
 );
 
-INSERT INTO Time(year, month, day, hour, minute, second, timezone)
+INSERT INTO Time(whole, year, month, day, hour, minute, second, timezone)
 SELECT 
+time_conn,
 EXTRACT(YEAR FROM time_conn) as year,
 EXTRACT(MONTH FROM time_conn) as month,
 EXTRACT(DAY FROM time_conn) as day,
