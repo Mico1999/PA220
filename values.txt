@@ -1,0 +1,41 @@
+Assignment 1 - PV220
+Marek Miček, 540461
+Peter Rúček, 540454
+
+--------------------------------------
+|    Analyze the data and report     |
+--------------------------------------
+
+--------------------------------------
+      Number of unique values 
+--------------------------------------
+
+sim_imsi - 99
+device - 33
+gsmnet_id - 82
+program_ver - 19
+car_key - 71
+service_key - 1 058 468
+log_key - 6 692 915
+
+--------
+ Errors
+--------
+gsmnet_id IS NULL or Empty - 41431 / 6
+
+--------------------------------------
+Number of unique values (January 2022)
+--------------------------------------
+
+sim_imsi - 18
+device - 4
+gsmnet_id - 4
+program_ver - 4
+car_key - 5
+service_key - 25
+log_key - 103
+
+--------
+ Errors
+--------
+gsmnet_id IS NULL or Empty - 0 / 0
