@@ -1,0 +1,37 @@
+ERD POPIS
+
+Autori:
+* Marek Miček, 540461
+* Peter Rúček, 540454
+
+*****************************************************
+TIME dimenzia
+*****************************************************
+Dimenzia je tvorená atribútmi extrahovanými z položky "time_conn" (typ timestamp) prislúchajúcej vstupnej tabuľke pa220_data. Položka "time" je zanedbaná, keďže sa líši od položky "time_conn"
+len v niekoľkých jednotkách sekúnd, takže sa dá predpokladať vzťah 1:1. Ďalšími položkami v tejto dimenzii sú celá timestamp položka whole, year, month, day, hour a minute. Celá timestamp
+položka je súčasťou tejto dimenzie pre uľahčenie práce so selectami (prípadné vyhľadavánien podľa dňa v týždni, či iné derivované vyhľadávanie, ktoré nie je až tak bežné aby bolo uložené samostatne
+v dimenzii). Sekundy a menšie položky sú z "time_conn" zanedbané, keďže vyhľadávanie podľa týchto položiek je málo pravdepodobné.
+- SCD => čas zaslania reportu sa meniť nebude, SCD 0 - Passive methon (No change)
+
+*****************************************************
+DEVICE dimenzia
+*****************************************************
+Obsahuje atribúty popisujúce model zariadenia a verziu aplikácie, ktorá beží na zariadení.
+- SCD => model ani verzia aplikácie sa v reporte meniť nebude, SCD 0 - Passive methon (No change)
+
+*****************************************************
+CAR dimenzia
+*****************************************************
+Obsahuje atribúty prevzaté z tabuľky pa220_car_info. Túto dimenziu pre požadovanú analýzu využívať nepotrebujeme, no mala by byť súčasťou dimenzionálneho modelu, tak aby bola umožnená
+prípadná rozšíriteľnosť tejto analýzy (užívateľ by chcel v budúcnosti dohľadať počet inštanciií aplikácie medzi jednotlivými značkami aút a pod.).
+- SCD => atributy tejto dimenzie sa môžu meniť zriedka alebo vôbec, môže sa napríklať meniť farba auta, no taká zmena je z hľadiska analýzy nepodstatná,
+takže sa dá riešiť klasickým prepísaním => SCD 1 - Overwriting the old value (Latest Record Only)
+
+*****************************************************
+SIMCARD dimenzia
+*****************************************************
+Obsahuje atribúty sim_imis a gsmnet_id. Gsmnet_id je rozšírený (extentd) na dimenziu MccMNCCountry.
+- SCD => sim_imis sa mení pri každomm reštarte appky, takže je vhodné si uchovať minulé a súčastné hodnoty pri daných inštanciach appky
+- SCD => gsmnet_id je zložené z kódu krajiny (pod%la medzinárodných dohôd, takže meniť sa isto nebude) a kódu operátora, ktorý sa meniť môže
+ => malo by sa uplatniť SCD 4 - Using history table, for rapidly changing dimensions
+
