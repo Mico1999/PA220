@@ -18,10 +18,12 @@ car_key - 71
 service_key - 1 058 468
 log_key - 6 692 915
 
---------
- Errors
---------
-gsmnet_id IS NULL or Empty - 41431 / 6
+----------------
+ Invalid values
+----------------
+gsmnet_id IS NULL or Empty -  6 / 41431
+
+All other attributes were OK.
 
 --------------------------------------
 Number of unique values (January 2022)
@@ -35,7 +37,7 @@ car_key - 5
 service_key - 25
 log_key - 103
 
---------
- Errors
---------
-gsmnet_id IS NULL or Empty - 0 / 0
+----------------
+ Invalid values
+----------------
+All attributes were OK.

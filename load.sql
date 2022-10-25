@@ -2,6 +2,7 @@
 -- Peter Rúček, 540454
 
 DROP TABLE IF EXISTS DataLog;
+DROP TABLE IF EXISTS Car;
 DROP TABLE IF EXISTS Device;
 DROP TABLE IF EXISTS SimCard;
 DROP TABLE IF EXISTS Status;
@@ -9,15 +10,14 @@ DROP TABLE IF EXISTS Time;
 DROP TABLE IF EXISTS MccMncCountry;
 
 
-
-CREATE TABLE DataLog(
-    foreign_id BIGSERIAL PRIMARY KEY,
-    log_key bigint
+CREATE TABLE Car (
+    company character varying(40),
+    car_key bigint PRIMARY KEY,
+    spz text,
+    make character varying(50),
+    color character varying(50),
+    tonnage numeric(4,1)
 );
-
-INSERT INTO DataLog(log_key)
-SELECT log_key
-FROM public.pa220_data;
 
 
 CREATE TABLE Device(
@@ -28,7 +28,7 @@ CREATE TABLE Device(
 
 INSERT INTO Device(device, program_ver)
 SELECT device, program_ver 
-FROM public.pa220_data
+FROM pa220_data
 ORDER BY device, program_ver;
 
 
@@ -40,22 +40,22 @@ CREATE TABLE SimCard (
 
 INSERT INTO SimCard(sim_imsi, gsmnet_id)
 SELECT sim_imsi, gsmnet_id
-FROM public.pa220_data;
+FROM pa220_data;
 
 
 CREATE TABLE Status (
-   status_id BIGSERIAL PRIMARY KEY,
-   car_key bigint, 
-   time timestamp with time zone,
-   app_run_time numeric(6,2),
-   pda_run_time numeric(10,2),
-   tracking_mode text,
-   battery_level text 
+    status_id BIGSERIAL PRIMARY KEY,
+    car_key bigint, 
+    time timestamp with time zone,
+    app_run_time numeric(6,2),
+    pda_run_time numeric(10,2),
+    tracking_mode text,
+    battery_level text
 );
 
 INSERT INTO Status(car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level)
 SELECT car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level
-FROM public.pa220_data;
+FROM pa220_data;
 
 
 CREATE TABLE Time(
@@ -76,7 +76,7 @@ EXTRACT(MONTH FROM time_conn) as month,
 EXTRACT(DAY FROM time_conn) as day,
 EXTRACT(HOUR FROM time_conn) as hour,
 EXTRACT(MINUTE FROM time_conn) as minute
-FROM public.pa220_data;
+FROM pa220_data;
 
 
 CREATE TABLE MccMncCountry (
@@ -89,6 +89,21 @@ CREATE TABLE MccMncCountry (
     country_code numeric,
     network text
 );
+
+
+
+CREATE TABLE DataLog(
+    foreign_id BIGSERIAL PRIMARY KEY,
+    log_key bigint,
+    CONSTRAINT fk_device FOREIGN KEY (foreign_id) REFERENCES Device(device_id),
+    CONSTRAINT fk_simcard FOREIGN KEY (foreign_id) REFERENCES SimCard(sim_card_id),
+    CONSTRAINT fk_status FOREIGN KEY (foreign_id) REFERENCES Status(status_id),
+    CONSTRAINT fk_time FOREIGN KEY (foreign_id) REFERENCES Time(time_id)
+);
+
+INSERT INTO DataLog(log_key)
+SELECT log_key
+FROM pa220_data;
 
 
 INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_code, network) VALUES ('202', 514, '01', 31, 'gr', 'Greece', 30, 'Cosmote');
@@ -2217,3 +2232,75 @@ INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_cod
 INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_code, network) VALUES ('901', 2305, '12', 303, 'n/a', 'Satellite Networks', 870, 'Maritime Communications Partner AS');
 INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_code, network) VALUES ('901', 2305, '13', 319, 'n/a', 'International Networks', 882, 'Antarctica');
 INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_code, network) VALUES ('901', 2305, '14', 335, 'n/a', 'Satellite Networks', 870, 'AeroMobile');
+
+
+INSERT INTO car VALUES ('TRADE AUTO CZ', 3709, '4B42612', 'MB', '#eaeaea', 24.0);
+INSERT INTO car VALUES ('TRADE AUTO CZ', 4440, '4B47213', 'Renault', '#ffffff', 18.0);
+INSERT INTO car VALUES ('TRADE AUTO CZ', 742, '9B92878', 'MB', '#333399', 15.0);
+INSERT INTO car VALUES ('T&T MOD', 4870, '7B29570', 'Scania', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('T&T MOD', 4481, '5RF1325', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('T&T MOD', 5039, '9RS6601', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('TRUCK SERVIS ITALY', 3505, '6RP8627', 'DAF', '', 0.0);
+INSERT INTO car VALUES ('TRUCK SERVIS ITALY', 5048, '9RQ3859', 'MAN', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('TRUCK SERVIS ITALY', 4411, '5RL9114', 'DAF', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('NIRVA TEX', 3914, '7M21868', 'Renault', '#CCCCCC', 18.0);
+INSERT INTO car VALUES ('NIRVA TEX', 4972, '4M14354', '-------', '#1100ff', 0.0);
+INSERT INTO car VALUES ('NIRVA TEX', 3916, '5RS6845', 'Renault', '#d4d4d4', 18.0);
+INSERT INTO car VALUES ('NIRVA TEX', 3915, '2M98311', 'Renault', '#FF0000', 18.0);
+INSERT INTO car VALUES ('DAVID AUTODOPRAVA', 4686, '9RU-9264', 'DAF', '#FFFFFF', 24.0);
+INSERT INTO car VALUES ('DAVID AUTODOPRAVA', 4391, '9RW-0232', 'MAN', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('DAVID AUTODOPRAVA', 4965, '9RH-4649', '-------', '', 0.0);
+INSERT INTO car VALUES ('KAMO&MOKA', 4843, '7M459-46', 'Iveco', '#ECE9D8', 0.0);
+INSERT INTO car VALUES ('KAMO&MOKA', 4374, '5P68318', 'Iveco', '#FF0000', 0.0);
+INSERT INTO car VALUES ('KAMO&MOKA', 5072, '9UO9758', 'Iveco', '', 0.0);
+INSERT INTO car VALUES ('TVARŮŽEK OLOMOUC', 4361, '0YX9023', 'MB', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('TVARŮŽEK OLOMOUC', 4996, '6YV7261', 'MB', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('TVARŮŽEK OLOMOUC', 4347, '0YX2609', 'MB', '#FFFFFF', 3.5);
+INSERT INTO car VALUES ('TIR TRANSPORT', 4465, '9RA-6528', 'Iveco ', '', 24.0);
+INSERT INTO car VALUES ('TIR TRANSPORT', 3832, '9RI-6182', 'MAN ', '', 1.1);
+INSERT INTO car VALUES ('TIR TRANSPORT', 4954, '9RU-1710', 'Fiat', '#FFFFFF', 3.5);
+INSERT INTO car VALUES ('TIR TRANSPORT', 4464, '7P7-1801', 'Peugeot ', '#ffffff', 1.1);
+INSERT INTO car VALUES ('FISCHER ING', 4407, '8F83074', 'Fiat', '', 2.0);
+INSERT INTO car VALUES ('FISCHER ING', 4318, '9UN6169', 'Renault', '', 1.5);
+INSERT INTO car VALUES ('FISCHER ING', 4439, '7UU0308', 'Renault', '', 1.3);
+INSERT INTO car VALUES ('FISCHER ING', 4433, '5RJ9298', 'Renault', '', 1.5);
+INSERT INTO car VALUES ('COUVAL DO VRAT', 4286, '0YO-2909', 'Scania', '#FF0000', 0.0);
+INSERT INTO car VALUES ('COUVAL DO VRAT', 3920, '0YL-1042', '-------', '#FF0000', 0.0);
+INSERT INTO car VALUES ('COUVAL DO VRAT', 4964, '2P2-9603', 'Scania', '#FF0000', 0.0);
+INSERT INTO car VALUES ('Fero Logistic', 4956, 'HH-666-VN', 'MAN', '#FFFFFF', 18.0);
+INSERT INTO car VALUES ('Fero Logistic', 4945, 'HH-391-AP', 'DAF', '#ff0000', 18.0);
+INSERT INTO car VALUES ('Fero Logistic', 4950, 'HH-856-VF', 'Volvo', '#FFFFFF', 18.0);
+INSERT INTO car VALUES ('GAF-LEX KOMIN', 4852, '2A6-4050', 'DAF', '#ECE9D8', 24.0);
+INSERT INTO car VALUES ('GAF-LEX KOMIN', 5146, '2A7-6230', 'DAF', '#FFFFFF', 24.0);
+INSERT INTO car VALUES ('GAF-LEX KOMIN', 3612, '7A7-9061', 'DAF', '', 24.0);
+INSERT INTO car VALUES ('K+H PNEU', 1533, '2A11963', 'MB', '#CCCCCC', 24.0);
+INSERT INTO car VALUES ('K+H PNEU', 4554, '2A18090', 'MB', '#CCCCCC', 24.0);
+INSERT INTO car VALUES ('K+H PNEU', 1097, '7A31638', 'MB', '#CCCCCC', 24.0);
+INSERT INTO car VALUES ('Truck consulting', 4198, '0YN1986', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('Truck consulting', 4054, '0YZ0021', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('Truck consulting', 4344, '0YT5367', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('Truck consulting', 3979, '0YP1132', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('RED FOX TRANS', 3430, '3F15901', 'DAF', '#0000ff', 6.0);
+INSERT INTO car VALUES ('RED FOX TRANS', 3579, '3F02950', 'DAF', '#ffff00', 6.0);
+INSERT INTO car VALUES ('RED FOX TRANS', 4631, '8F98112', 'DAF ', '#00ff00', 8.0);
+INSERT INTO car VALUES ('RED FOX TRANS', 3421, '5RI6385', 'Iveco', '#000000', 6.0);
+INSERT INTO car VALUES ('LADI KOMPAKT', 4896, '0GH-29-29', 'DAF', '#00FFCC', 0.0);
+INSERT INTO car VALUES ('LADI KOMPAKT', 4856, '0GH-24-24', 'DAF', '#3399FF', 0.0);
+INSERT INTO car VALUES ('LADI KOMPAKT', 3020, '3G2-45-75', 'Volvo', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('JAN BNT', 4223, '5RG5797', 'Scania', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('JAN BNT', 4725, '5RW5439', 'Scania', '#FFFFFF', 18.0);
+INSERT INTO car VALUES ('JAN BNT', 4306, '9RB3023', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('JAN BNT', 4929, '6YL4156', 'Scania', '#FFFFFF', 24.0);
+INSERT INTO car VALUES ('ZEXENO', 4855, '3Y4-1275', 'Scania', '', 0.0);
+INSERT INTO car VALUES ('ZEXENO', 4887, '9M4-2700', '-------', '', 0.0);
+INSERT INTO car VALUES ('ZEXENO', 4004, '5RS-5770', 'Renault', '', 0.0);
+INSERT INTO car VALUES ('LENKA IGRL', 1745, '4F49149', 'MB', '#FFFFFF', 24.0);
+INSERT INTO car VALUES ('LENKA IGRL', 1863, '5Z04214', 'MB', '#FFFFFF', 0.0);
+INSERT INTO car VALUES ('LENKA IGRL', 4589, '7M18644', 'MB', '#000000', 0.0);
+INSERT INTO car VALUES ('AUTODOPRAVA G&H', 280, '9UP1127', 'Renault', '#00FFFF', 0.7);
+INSERT INTO car VALUES ('AUTODOPRAVA G&H', 2873, '7UU1094', 'Renault', '#3333FF', 2.4);
+INSERT INTO car VALUES ('AUTODOPRAVA G&H', 342, '5RW4233', 'Renault', '#FFFFFF', 1.2);
+INSERT INTO car VALUES ('AUTODOPRAVA G&H', 3797, '4UA3509', 'MAN', '#FF0000', 1.0);
+INSERT INTO car VALUES ('AV URBI TRANS', 4747, '0YO-3551', 'MAN', '', 24.0);
+INSERT INTO car VALUES ('AV URBI TRANS', 4849, '0YO2166', '-------', '', 0.0);
+INSERT INTO car VALUES ('AV URBI TRANS', 4999, '2P9-0767', 'MAN', '#FF0000', 0.0);
