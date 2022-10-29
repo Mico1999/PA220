@@ -20,65 +20,6 @@ CREATE TABLE Car (
 );
 
 
-CREATE TABLE Device(
-    device_id BIGSERIAL PRIMARY KEY,
-    device text,
-    program_ver character varying(6)
-);
-
-INSERT INTO Device(device, program_ver)
-SELECT device, program_ver 
-FROM pa220_data
-ORDER BY device, program_ver;
-
-
-CREATE TABLE SimCard (
-    sim_card_id BIGSERIAL PRIMARY KEY,
-    sim_imsi character(15),
-    gsmnet_id character varying(6)
-);
-
-INSERT INTO SimCard(sim_imsi, gsmnet_id)
-SELECT sim_imsi, gsmnet_id
-FROM pa220_data;
-
-
-CREATE TABLE Status (
-    status_id BIGSERIAL PRIMARY KEY,
-    car_key bigint, 
-    time timestamp with time zone,
-    app_run_time numeric(6,2),
-    pda_run_time numeric(10,2),
-    tracking_mode text,
-    battery_level text
-);
-
-INSERT INTO Status(car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level)
-SELECT car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level
-FROM pa220_data;
-
-
-CREATE TABLE Time(
-    time_id BIGSERIAL PRIMARY KEY,
-    whole timestamp with time zone,
-    year numeric,
-    month numeric,
-    day numeric,
-    hour numeric,
-    minute numeric
-);
-
-INSERT INTO Time(whole, year, month, day, hour, minute)
-SELECT 
-time_conn,
-EXTRACT(YEAR FROM time_conn) as year,
-EXTRACT(MONTH FROM time_conn) as month,
-EXTRACT(DAY FROM time_conn) as day,
-EXTRACT(HOUR FROM time_conn) as hour,
-EXTRACT(MINUTE FROM time_conn) as minute
-FROM pa220_data;
-
-
 CREATE TABLE MccMncCountry (
     mcc character varying(3),
     mcc_int numeric,
@@ -89,22 +30,6 @@ CREATE TABLE MccMncCountry (
     country_code numeric,
     network text
 );
-
-
-
-CREATE TABLE DataLog(
-    foreign_id BIGSERIAL PRIMARY KEY,
-    log_key bigint,
-    CONSTRAINT fk_device FOREIGN KEY (foreign_id) REFERENCES Device(device_id),
-    CONSTRAINT fk_simcard FOREIGN KEY (foreign_id) REFERENCES SimCard(sim_card_id),
-    CONSTRAINT fk_status FOREIGN KEY (foreign_id) REFERENCES Status(status_id),
-    CONSTRAINT fk_time FOREIGN KEY (foreign_id) REFERENCES Time(time_id)
-);
-
-INSERT INTO DataLog(log_key)
-SELECT log_key
-FROM pa220_data;
-
 
 INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_code, network) VALUES ('202', 514, '01', 31, 'gr', 'Greece', 30, 'Cosmote');
 INSERT INTO mccmnccountry (mcc, mcc_int, mnc, mnc_int, iso, country, country_code, network) VALUES ('202', 514, '02', 47, 'gr', 'Greece', 30, 'Cosmote');
@@ -2304,3 +2229,91 @@ INSERT INTO car VALUES ('AUTODOPRAVA G&H', 3797, '4UA3509', 'MAN', '#FF0000', 1.
 INSERT INTO car VALUES ('AV URBI TRANS', 4747, '0YO-3551', 'MAN', '', 24.0);
 INSERT INTO car VALUES ('AV URBI TRANS', 4849, '0YO2166', '-------', '', 0.0);
 INSERT INTO car VALUES ('AV URBI TRANS', 4999, '2P9-0767', 'MAN', '#FF0000', 0.0);
+
+
+----------------------------------------------------------------------
+CREATE TABLE Device(
+    device_id BIGSERIAL PRIMARY KEY,
+    device text,
+    program_ver character varying(6)
+);
+
+INSERT INTO Device(device, program_ver)
+SELECT device, program_ver 
+FROM pa220_data
+ORDER BY device, program_ver;
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+CREATE TABLE SimCard (
+    sim_card_id BIGSERIAL PRIMARY KEY,
+    sim_imsi character(15),
+    gsmnet_id character varying(6),
+    iso character varying(3),
+    country text,
+    country_code numeric,
+    network text
+);
+
+INSERT INTO SimCard(sim_imsi, gsmnet_id, iso, country, country_code, network)
+SELECT sim_imsi, gsmnet_id, iso, country, country_code, network
+FROM pa220_data JOIN MccMncCountry on 
+( LEFT(gsmnet_id, 3) like concat('%',mcc,'%') 
+AND RIGHT(gsmnet_id, 3) like concat('%',mnc,'%') );
+
+DROP TABLE MccMncCountry;
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+CREATE TABLE Status (
+    status_id BIGSERIAL PRIMARY KEY,
+    car_key bigint, 
+    time timestamp with time zone,
+    app_run_time numeric(6,2),
+    pda_run_time numeric(10,2),
+    tracking_mode text,
+    battery_level text,
+    CONSTRAINT fk_car FOREIGN KEY (car_key) REFERENCES Car(car_key)
+);
+
+INSERT INTO Status(car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level)
+SELECT car_key, "time", app_run_time, pda_run_time, tracking_mode, battery_level
+FROM pa220_data;
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+CREATE TABLE Time(
+    time_id BIGSERIAL PRIMARY KEY,
+    whole timestamp with time zone,
+    year numeric,
+    month numeric,
+    day numeric,
+    hour numeric,
+    minute numeric
+);
+
+INSERT INTO Time(whole, year, month, day, hour, minute)
+SELECT 
+time_conn,
+EXTRACT(YEAR FROM time_conn) as year,
+EXTRACT(MONTH FROM time_conn) as month,
+EXTRACT(DAY FROM time_conn) as day,
+EXTRACT(HOUR FROM time_conn) as hour,
+EXTRACT(MINUTE FROM time_conn) as minute
+FROM pa220_data;
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+CREATE TABLE DataLog(
+    foreign_id BIGSERIAL PRIMARY KEY,
+    log_key bigint,
+    CONSTRAINT fk_device FOREIGN KEY (foreign_id) REFERENCES Device(device_id),
+    CONSTRAINT fk_simcard FOREIGN KEY (foreign_id) REFERENCES SimCard(sim_card_id),
+    CONSTRAINT fk_status FOREIGN KEY (foreign_id) REFERENCES Status(status_id),
+    CONSTRAINT fk_time FOREIGN KEY (foreign_id) REFERENCES Time(time_id)
+);
+
+INSERT INTO DataLog(log_key)
+SELECT log_key
+FROM pa220_data;
+----------------------------------------------------------------------
