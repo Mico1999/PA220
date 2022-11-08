@@ -7,7 +7,15 @@
 -- List raw results (particular app instance (sim_imsi)),
 -- as well as aggregates by device model (e.g., “HUAWEI CUN-L21”) and by app version.
 
-SELECT sim_imsi, device, program_ver, count(sim_imsi) AS Connection_Count
-FROM DataLogView
-GROUP BY GROUPING SETS((sim_imsi), (device), (program_ver))
-ORDER BY Connection_Count DESC;
+SELECT sim_imsi, device, program_ver, COUNT(*)
+FROM (
+    SELECT sim_imsi, device, program_ver, whole, 
+    LEAD(whole, 1) 
+    OVER(PARTITION BY sim_imsi ORDER BY sim_imsi, whole)
+    FROM DataLogView
+) inn
+
+WHERE EXTRACT(MINUTE FROM (inn.lead - whole)) < 5 AND
+device IS NOT NULL AND -- ?
+program_ver IS NOT NULL -- ?
+GROUP BY GROUPING SETS((sim_imsi), (device), (program_ver));
