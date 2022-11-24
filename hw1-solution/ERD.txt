@@ -1,0 +1,65 @@
+--====================================================================================================================--
+Dimensional model for this assignment consists of 1 fact table and 8 dimensions (+2 degenerate dimensions).
+--====================================================================================================================--
+
+
+--====================================================================================================================--
+Dimensions:
+
+	*  Description of granularity: 
+		We decided for fine granularity. There is more than one reason for this decision. For example we decided to create to separate dimension for model (Model_dimension) and we moved connection_method with tracking_mode to fact table, this decision was made because in some rows of the source tables there were values missing (null values) and we need to keep track of this kind of situation for future analyses (e.g. we would like to analyze the reliability of transmission). Keeping all those values in one dimension table would lead to very high number of rows (we would need row for every possible combination of values - even with NULLs). This division also allows us to add some additional data as described later (e.g. manufacturer of release_date for model) which can enhance our ability to 'mine' information from the DW. The same applies for GSM_netword_dimension and Simcard_dimension. In the source data the combination of sim_imsi and gsmnet_id was not constant - this would lead to huge number of rows in such dimension table. Also the division those 2 parameters into two seperate dimension allows us to keep track of additional data like country of the operator or telephone number of the sim.
+
+	1. Car_dimension:
+		Car_dimension holds specific information for each car_key from original table car_info.
+		Column "car_key" from original table is in Car_dimension renamed to "car_id" in order to specify new car_key column in Car_dimension which will serve as surrogate key in fact table
+		In case of attributes like car_id, weight, make or tonage it is not expected that it will change over time, however some changes can happen for attributes like color (car can be repainted) or spz.
+		As these changes can happen multiple times, this dimension is qualified as SCD Type 2. For that reason in order to track history of changes, columns valid_from, valid_to and current_row were added into this dimension table, therefore the combination of car_id and current_row is UNIQUE.
+
+	2. App_dimension:
+		App_dimension holds specific information for each application, in this case we do not have any other additional information besides program_ver, which is not expected to change over time. 
+		But if by any chance this happens, we have decided just to overwirte existing value with the new one. 
+		Therefore, this dimension is classified as SCD type 1.
+		The reason why it is not just a degenerate dimension is that in future there can be other additional columns in this dimension which describe the app version - e.g. released_date, manufacturer (Microsoft, Goole), etc.
+
+	3. Model_dimension:
+		Model_dimension contians information about model of the device. So far there is only model name, but in future there can be other information about model e.g. manufacturer, release_date, etc.
+		Since model is not expected to change, this dimension is classified as SCD type 1, so that in case of unexpected change we just overwrite existing value with new one.
+
+	4. GSM_network_dimension:
+		GSM_network_dimension holds specific information about network.
+		In case of gsmnet_id attribute, it is not expected to change over time.
+		In case of country_name, it can possibly change over time, however we want to keep only actual values. 
+		For the reasons above, this dimensions is classified as SCD type 1.
+		
+	5. Simcard_dimension: (app instance)
+		Sim_card_dimension holds only sim_imsi id as we don't have other additional info about sim cards, but it can happen that in the future there will be additional attributes in this dimension (e.g. provider_name, telephone_number, etc.).
+		As sim_imsi attribute is not expected to change, we decided to classify it as SCD type 1, so in case of unexpected change, we'll keep just actual value.
+
+	6. Date_dimension:
+		Date_dimension holds all possible combinations of year, month and day columns. 
+		Since Date_dimension holds from the beggining all possible values, it is considered as a static dimension which attributes won't change.
+	
+	7. Time_dimension:
+		Time_dimension holds all possible combinations of hour, minute and seccond columns.
+		Since Time_dimension holds from the beggining all possible values, it is considered as a static dimension in which attributes won't change.	
+
+--====================================================================================================================--
+Fact:
+	1. Status_fact:
+			a. Surrogate key to all dimensions (Time, Date, Car, App, Model, GSM_network, Simcard)
+			b. Degenerate dimensions - conn_method and tracking_mode 
+				Each of them serves as enum and has only couple of distinct values. 
+				Moreover, as there is none additional info about connection or tracking, there is no need to create seperate dimensions for them.
+			c. Particular measures:
+				i.   App run time - represents value in hours elapsed since the app has been started
+				ii.  Pda run time - represents value in hours since the phone has been booted
+				iii. Battery level - represents charge status in per-cent at the given time
+				iv.  Connection count - representes the number of data transfers between two consecutive status records
+
+				Measures i-iii are semi additive, as they are like snapshots reported every 10minutes and cannot be aggregated over time.
+                                Measure iv is additive.
+
+
+--====================================================================================================================--
+-- Credits: Dominik Rumian, 435378; Matej Michálek, 469372; Vlastislav Dohnal, 2952
+--====================================================================================================================--

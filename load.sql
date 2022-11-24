@@ -2240,11 +2240,11 @@ CREATE TABLE Device(
 
 INSERT INTO Device(device, program_ver)
 SELECT device, program_ver 
-FROM pa220_data
-ORDER BY device, program_ver;
+FROM pa220_data;
 ----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
+DROP TABLE IF EXISTS SimCard CASCADE;
 CREATE TABLE SimCard (
     sim_card_id BIGSERIAL PRIMARY KEY,
     sim_imsi character(15),
@@ -2257,11 +2257,14 @@ CREATE TABLE SimCard (
 
 INSERT INTO SimCard(sim_imsi, gsmnet_id, iso, country, country_code, network)
 SELECT sim_imsi, gsmnet_id, iso, country, country_code, network
-FROM pa220_data JOIN MccMncCountry on 
+FROM pa220_data 
+LEFT JOIN MccMncCountry on 
 ( LEFT(gsmnet_id, 3) like concat('%',mcc,'%') 
-AND RIGHT(gsmnet_id, 3) like concat('%',mnc,'%') );
+AND RIGHT(gsmnet_id, 2) like concat('%',mnc,'%') );
 
 DROP TABLE MccMncCountry;
+
+SELECT Count(*) FROM SimCard;
 ----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
