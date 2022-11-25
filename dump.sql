@@ -71,81 +71,151 @@
 -- JOIN SimCard sc ON (d.foreign_id = sc.sim_card_id)
 -- JOIN Device dev ON (d.foreign_id = dev.device_id);
 
-
---CORRECT BY NOW
--- SELECT (SELECT min FROM
---     (SELECT sim_imsi, MIN(whole) min
---         FROM DataLogView
---         WHERE sim_imsi IS NOT NULL
---         AND program_ver = 'A59'
---         GROUP BY sim_imsi
---         ORDER BY min ASC
---         FETCH FIRST 10 ROWS ONLY
---     ) t2
---     ORDER BY min DESC
--- LIMIT 1 ) first_appearance,
--- (SELECT release_datetime
---     FROM app_version_info
---     WHERE version = 'A59'
--- ) release_date,
-
--- EXTRACT(DAYS FROM 
---     (SELECT min FROM
---         (SELECT sim_imsi, MIN(whole) min
---             FROM DataLogView
---             WHERE sim_imsi IS NOT NULL
---             AND program_ver = 'A59'
---             GROUP BY sim_imsi
---             ORDER BY min ASC
---             FETCH FIRST 10 ROWS ONLY
---         ) t1
---         ORDER BY min DESC
---     LIMIT 1 
---     ) -
---     (SELECT release_datetime
---         FROM app_version_info
---         WHERE version = 'A59'
---     )
--- ) as days;
-
-
-
--- SELECT * FROM(
--- --     SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
--- --     min58
--- --     FROM
---         --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
---         (SELECT sim_imsi, MIN(whole) as min58
---         FROM DataLogView
---         WHERE sim_imsi IS NOT NULL
---         AND program_ver = 'A58'
---         GROUP BY sim_imsi
---         ORDER BY min58 ASC) d58
---         LEFT JOIN 
---         (SELECT sim_imsi, MIN(whole) as min59
---         FROM DataLogView
---         WHERE sim_imsi IS NOT NULL
---         AND program_ver = 'A59'
---         GROUP BY sim_imsi
---         ) d59
---         on d58.sim_imsi = d59.sim_imsi
-        
--- ) as t;
--- -- WHERE rownumber = 10 OR (rownumber = 100 
--- -- OR rownumber = null );
-
-
-
-SELECT sim_imsi, MIN(whole) as min58
+---------------------------------------------------------------
+--calculate 10 and 100 instances duration from a58 appearance
+SELECT (SELECT min FROM
+    (SELECT sim_imsi, MIN(whole) min
         FROM DataLogView
         WHERE sim_imsi IS NOT NULL
         AND program_ver = 'A58'
         GROUP BY sim_imsi
-        ORDER BY min58 ASC;
+        ORDER BY min ASC
+        FETCH FIRST 10 ROWS ONLY
+    ) t2
+    ORDER BY min DESC
+LIMIT 1 ) first_appearance,
+(SELECT release_datetime
+    FROM app_version_info
+    WHERE version = 'A58'
+) release_date,
 
-SELECT sim_imsi, MIN(time_conn) as min58
-        FROM pa220_data
+EXTRACT(DAYS FROM 
+    (SELECT min FROM
+        (SELECT sim_imsi, MIN(whole) min
+            FROM DataLogView
+            WHERE sim_imsi IS NOT NULL
+            AND program_ver = 'A58'
+            GROUP BY sim_imsi
+            ORDER BY min ASC
+            FETCH FIRST 10 ROWS ONLY
+        ) t1
+        ORDER BY min DESC
+    LIMIT 1 
+    ) -
+    (SELECT release_datetime
+        FROM app_version_info
+        WHERE version = 'A58'
+    )
+) as days;
+
+---------------------------------------------------------------
+-- alternative
+SELECT * FROM(
+    SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
+    min58
+    FROM
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, MIN(whole) as min58
+        FROM DataLogView
         WHERE sim_imsi IS NOT NULL
         AND program_ver = 'A58'
         GROUP BY sim_imsi
-        ORDER BY min58 ASC;
+        ORDER BY min58 ASC) d58
+        
+) as t
+WHERE rownumber = 10 OR (rownumber = 100 
+OR rownumber = null );
+
+---------------------------------------------------------------
+CREATE TEMP TABLE table58(
+        min58 date,
+        counter int
+);
+
+CREATE TEMP TABLE table59(
+        min59 date,
+        counter int
+);
+
+-- table with a58 sim imsi first appearance
+-- grouped to installation count on concrete day
+INSERT INTO table58(min58, counter)
+SELECT min58, count(*) FROM(
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, CAST(MIN(whole) as DATE) as min58
+        FROM DataLogView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A58'
+        GROUP BY sim_imsi
+        ORDER BY min58 ASC) d58
+        LEFT JOIN 
+        (SELECT sim_imsi, CAST(MIN(whole) as DATE) as min59
+        FROM DataLogView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A59'
+        GROUP BY sim_imsi
+        ) d59
+        on d58.sim_imsi = d59.sim_imsi 
+) as t
+GROUP BY min58
+ORDER BY min58 ASC;
+
+
+-- table with a59 sim imsi first appearance and a58 was installed before
+-- grouped to installation count on concrete day
+INSERT INTO table59(min59, counter)
+SELECT min59, count(*) FROM 
+(
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, CAST(MIN(whole) as DATE) as min58
+        FROM DataLogView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A58'
+        GROUP BY sim_imsi
+        ORDER BY min58 ASC) d58
+        LEFT JOIN 
+        (SELECT sim_imsi, CAST(MIN(whole) as DATE) as min59
+        FROM DataLogView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A59'
+        GROUP BY sim_imsi
+        ) d59
+        on d58.sim_imsi = d59.sim_imsi 
+) as t
+WHERE min59 IS NOT NULL
+GROUP BY min59
+ORDER BY min59 ASC;
+
+-- make a59 values negative
+UPDATE table59 SET counter= 0-counter;
+
+
+-- calculating number of installation of a58 on certain day
+CREATE TEMP TABLE tmp (
+   date date,
+   row_sum int
+);
+
+DO $$
+DECLARE sum_counter int := 0;
+DECLARE single_count int;
+DECLARE single_date date;
+BEGIN
+FOR single_count, single_date IN 
+SELECT counter, date FROM 
+-- unioned tables : a58 are +, a59 are -
+(SELECT counter, min58 as date FROM 
+(SELECT * FROM table58 UNION SELECT * FROM table59) unioned
+ORDER BY date ) as t
+LOOP
+        sum_counter := sum_counter + single_count;
+        INSERT INTO tmp(date, row_sum) values(single_date, sum_counter);
+END LOOP;
+
+END$$;
+
+-- peak of all days
+SELECT date, row_sum
+FROM tmp 
+WHERE row_sum = ( SELECT MAX(row_sum) FROM tmp );
+---------------------------------------------------------------
