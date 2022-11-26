@@ -62,8 +62,6 @@
 -- INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (6774806, '2021-05-19 22:34:31+02', 'A59');
 -- INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (6796247, '2022-01-25 14:57:44+01', 'A60');
 
--- ALTER TABLE DataLog
--- ADD CONSTRAINT fk_simcard FOREIGN KEY (foreign_id) REFERENCES SimCard(sim_card_id);
 
 -- CREATE OR REPLACE VIEW DataLogView AS
 -- SELECT * FROM DataLog d JOIN TIME t ON (d.foreign_id = t.time_id)
@@ -71,60 +69,8 @@
 -- JOIN SimCard sc ON (d.foreign_id = sc.sim_card_id)
 -- JOIN Device dev ON (d.foreign_id = dev.device_id);
 
----------------------------------------------------------------
---calculate 10 and 100 instances duration from a58 appearance
-SELECT (SELECT min FROM
-    (SELECT sim_imsi, MIN(whole) min
-        FROM DataLogView
-        WHERE sim_imsi IS NOT NULL
-        AND program_ver = 'A58'
-        GROUP BY sim_imsi
-        ORDER BY min ASC
-        FETCH FIRST 10 ROWS ONLY
-    ) t2
-    ORDER BY min DESC
-LIMIT 1 ) first_appearance,
-(SELECT release_datetime
-    FROM app_version_info
-    WHERE version = 'A58'
-) release_date,
 
-EXTRACT(DAYS FROM 
-    (SELECT min FROM
-        (SELECT sim_imsi, MIN(whole) min
-            FROM DataLogView
-            WHERE sim_imsi IS NOT NULL
-            AND program_ver = 'A58'
-            GROUP BY sim_imsi
-            ORDER BY min ASC
-            FETCH FIRST 10 ROWS ONLY
-        ) t1
-        ORDER BY min DESC
-    LIMIT 1 
-    ) -
-    (SELECT release_datetime
-        FROM app_version_info
-        WHERE version = 'A58'
-    )
-) as days;
 
----------------------------------------------------------------
--- alternative
-SELECT * FROM(
-    SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
-    min58
-    FROM
-        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
-        (SELECT sim_imsi, MIN(whole) as min58
-        FROM DataLogView
-        WHERE sim_imsi IS NOT NULL
-        AND program_ver = 'A58'
-        GROUP BY sim_imsi
-        ORDER BY min58 ASC) d58
-        
-) as t
-WHERE rownumber = 10 OR (rownumber = 100 
-OR rownumber = null );
 
 ---------------------------------------------------------------
 CREATE TEMP TABLE table58(
@@ -214,8 +160,55 @@ END LOOP;
 
 END$$;
 
--- peak of all days
-SELECT date, row_sum
-FROM tmp 
-WHERE row_sum = ( SELECT MAX(row_sum) FROM tmp );
+
 ---------------------------------------------------------------
+
+SELECT ten, hundred, peak FROM (
+SELECT ten, hundred FROM(
+SELECT max(to_char) as ten FROM (
+SELECT * FROM(
+    SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
+    TO_CHAR(AGE(min58, CAST ((SELECT release_datetime
+        FROM app_version_info
+        WHERE version = 'A58') AS DATE
+        )), 'DD "Days" hh "Hours"') as to_char
+    FROM
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, MIN(whole) as min58
+        FROM DataLogView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A58'
+        GROUP BY sim_imsi
+        ORDER BY min58 ASC) d58    
+    ) as t
+WHERE rownumber = 10) ten ) ten 
+LEFT JOIN
+(SELECT max(to_char) as hundred FROM 
+(SELECT * FROM(
+    SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
+    TO_CHAR(AGE(min58, CAST ((SELECT release_datetime
+        FROM app_version_info
+        WHERE version = 'A58') AS DATE
+        )), 'DD "Days" hh "Hours"') as to_char
+    FROM
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, MIN(whole) as min58
+        FROM DataLogView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A58'
+        GROUP BY sim_imsi
+        ORDER BY min58 ASC) d58    
+    ) as t
+WHERE rownumber = 100) hundred ) hundred
+ON 1=1) ten_hundred
+LEFT JOIN
+-- peak of all days
+(SELECT to_char as peak FROM (
+SELECT row_sum,
+TO_CHAR(AGE(date, CAST ((SELECT release_datetime
+        FROM app_version_info
+        WHERE version = 'A58') AS DATE
+        )), 'DD "Days" hh "Hours"') as to_char
+FROM tmp 
+WHERE row_sum = ( SELECT MAX(row_sum) FROM tmp )) peak) peak
+on 1=1;
