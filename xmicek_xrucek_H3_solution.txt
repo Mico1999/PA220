@@ -1,0 +1,214 @@
+-- Marek Miček, 540461
+-- Peter Rúček, 540454
+--------------------------------------------------------------------------
+1.) STEPS TO INTEGRATE NEW DATA
+--------------------------------------------------------------------------
+
+We decided to make dump file from release-dates.csv and insert these values into newly created dimension app_version_info. The main reason is
+that we want to avoid making redundancy in dimension with app version (dimension Device in our DWH), cause adding release data in each row 
+with app version is not very practical (i.e. we are interested in release date of app version A58, so in case of our analysis, it is more 
+practical to make one select query to new dimension for getting required release date). New dimension app_version_info has attributes archive_size,
+release_datetime, version. This process of inserting new data is inspired by Vertical partitioning (from lecture's slides) which enables us to to 
+optimaze records grouped together. On the other side, joins over partitions can be expensive, but optimalization with indexes can cut down this negative.  
+
+First couple of rows are pasted below to demonstrate insert process of release data.
+
+CREATE TABLE public.app_version_info (
+    archive_size bigint,
+    release_datetime timestamp with time zone,
+    version character varying
+);
+
+-- dump copy of release-dates.csv
+INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (584268, '2011-02-28 09:04:08+01', 'A01');
+INSERT INTO public.app_version_info (archive_si ze, release_datetime, version) VALUES (657411, '2011-03-21 13:20:55+01', 'A02');
+INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (696246, '2011-04-12 08:06:44+02', 'A03');
+INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (734715, '2011-08-10 21:17:54+02', 'A04');
+INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (739532, '2011-12-28 20:22:51+01', 'A06');
+INSERT INTO public.app_version_info (archive_size, release_datetime, version) VALUES (745164, '2012-01-12 23:45:27+01', 'A07'); 
+
+--------------------------------------------------------------------------
+WHOLE SELECT & MATERIALIZED VIEWS
+--------------------------------------------------------------------------
+The SELECT calculates first 10 and first 100 installations of program version A58 and the peak is calculated 
+as the number of maximum devices with installed version A58 on certain date (which did not upgrade to A59).
+
+
+--DROP MATERIALIZED VIEW DataLogMView;
+
+CREATE MATERIALIZED VIEW DataLogMView(foreign_id) AS
+SELECT * FROM DataLog d JOIN TIME t ON (d.foreign_id = t.time_id)
+JOIN Status s ON (d.foreign_id = s.status_id)
+JOIN SimCard sc ON (d.foreign_id = sc.sim_card_id)
+JOIN Device dev ON (d.foreign_id = dev.device_id);
+
+
+--DROP MATERIALIZED VIEW Sim_imsi_with_First_Date;
+
+CREATE MATERIALIZED VIEW Sim_imsi_with_First_Date(whole) AS
+SELECT * FROM((SELECT sim_imsi, CAST(MIN(whole) as DATE) as min58
+FROM DataLogMView
+WHERE sim_imsi IS NOT NULL
+AND program_ver = 'A58'
+GROUP BY sim_imsi
+ORDER BY min58 ASC) d58
+LEFT JOIN 
+(SELECT sim_imsi, CAST(MIN(whole) as DATE) as min59
+FROM DataLogMView
+WHERE sim_imsi IS NOT NULL
+AND program_ver = 'A59'
+GROUP BY sim_imsi
+) d59
+on d58.sim_imsi = d59.sim_imsi) view;
+
+--DROP INDEX program_ver_index;
+CREATE INDEX program_ver_index ON DataLogMView USING btree(program_ver);
+---------------------------------------------------------------
+
+CREATE TEMP TABLE table58(
+        min58 date,
+        counter int
+);
+
+CREATE TEMP TABLE table59(
+        min59 date,
+        counter int
+);
+
+-- table with a58 sim imsi first appearance
+-- grouped to installation count on concrete day
+INSERT INTO table58(min58, counter)
+SELECT min58, count(*) FROM Sim_imsi_with_First_Date
+GROUP BY min58
+ORDER BY min58 ASC;
+
+
+-- table with a59 sim imsi first appearance and a58 was installed before
+-- grouped to installation count on concrete day
+INSERT INTO table59(min59, counter)
+SELECT min59, count(*) FROM Sim_imsi_with_First_Date
+WHERE min59 IS NOT NULL
+GROUP BY min59
+ORDER BY min59 ASC;
+
+-- make a59 values negative
+UPDATE table59 SET counter= 0-counter;
+
+
+-- calculating number of installation of a58 on certain day
+CREATE TEMP TABLE tmp (
+   date date,
+   row_sum int
+);
+
+DO $$
+DECLARE sum_counter int := 0;
+DECLARE single_count int;
+DECLARE single_date date;
+BEGIN
+FOR single_count, single_date IN 
+SELECT counter, date FROM 
+-- unioned tables : a58 are +, a59 are -
+(SELECT counter, min58 as date FROM 
+(SELECT * FROM table58 UNION SELECT * FROM table59) unioned
+ORDER BY date ) as t
+LOOP
+        sum_counter := sum_counter + single_count;
+        INSERT INTO tmp(date, row_sum) values(single_date, sum_counter);
+END LOOP;
+
+END$$;
+
+
+---------------------------------------------------------------
+
+SELECT ten, hundred, peak FROM (
+SELECT ten, hundred FROM(
+SELECT max(to_char) as ten FROM (
+SELECT * FROM(
+    SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
+    TO_CHAR(AGE(min58, CAST ((SELECT release_datetime
+        FROM app_version_info
+        WHERE version = 'A58') AS DATE
+        )), 'DD "Days" hh "Hours"') as to_char
+    FROM
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, MIN(whole) as min58
+        FROM DataLogMView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A58'
+        GROUP BY sim_imsi
+        ORDER BY min58 ASC) d58    
+    ) as t
+WHERE rownumber = 10) ten ) ten 
+LEFT JOIN
+(SELECT max(to_char) as hundred FROM 
+(SELECT * FROM(
+    SELECT ROW_NUMBER() OVER(ORDER BY  min58) as rownumber,
+    TO_CHAR(AGE(min58, CAST ((SELECT release_datetime
+        FROM app_version_info
+        WHERE version = 'A58') AS DATE
+        )), 'DD "Days" hh "Hours"') as to_char
+    FROM
+        --TABLE OF ALL SIMIMSI WITH FIRST DATE OF INSTALLATION
+        (SELECT sim_imsi, MIN(whole) as min58
+        FROM DataLogMView
+        WHERE sim_imsi IS NOT NULL
+        AND program_ver = 'A58'
+        GROUP BY sim_imsi
+        ORDER BY min58 ASC) d58    
+    ) as t
+WHERE rownumber = 100) hundred ) hundred
+ON 1=1) ten_hundred
+LEFT JOIN
+-- peak of all days
+(SELECT row_sum as peak FROM (
+SELECT row_sum
+-- TO_CHAR(AGE(date, CAST ((SELECT release_datetime
+--         FROM app_version_info
+--         WHERE version = 'A58') AS DATE
+--         )), 'DD "Days" hh "Hours"') as to_char
+FROM tmp 
+WHERE row_sum = ( SELECT MAX(row_sum) FROM tmp )) peak) peak
+on 1=1;
+
+ 
+--------------------------------------------------------------------------
+INFLUENCE OF MATERIALIZED VIEW IN INSERTS
+--------------------------------------------------------------------------
+In order to simplify the query we created a beforehand materialized view DataLogMView which contains all data
+from the DWH. We used temporary tables for storing data of all SIM_IMSI with first date of installation. This 
+tables were created from data from DataLogMView SELECT, which contains all the data, so it is pretty big.
+These INSERTS took a significant time when no materialized view was used (average from 5 executions):
+	4087 ms for first table
+	7941 ms for second table
+So we used a materialzed view for these insertions Sim_imsi_with_First_Date and the results are following (average from 5 executions):
+	0.8566 ms for first table
+	0.4016 ms for second table
+
+As you can see the improvement is huge and the insertions were 12000 times faster in average. The main reason is that materialized view
+Sim_imsi_with_First_Date acts like a cache and holds data to be inserted into temporary tables. In the future we should not forget to maintain MW
+and refresh it with triggers to make it consistent with underlying tables, but it was not the main purpose of this home assignment.
+
+--------------------------------------------------------------------------
+INFLUENCE OF INDEXES IN SELECT
+--------------------------------------------------------------------------
+Next step in improving the speed of our SELECT was to create index(es). The averge time of the SELECT which creates
+the final result (SELECT ten, hundred, peak FROM ... ) was: 3765 ms
+
+We tried Btree indexes on diferent columns, but the only one where they were applied successfully were on program version.
+So we created an index like this:
+	CREATE INDEX program_ver_index ON DataLogMView USING btree(program_ver);
+
+The improvement is visible and the average time of the SELECT with the program version index is: 695 ms
+Since indexes should be used on columns with a small number of null values and on columns used in where/order clauses, it is quite logical that index on column
+app_version in our DWH can reduce execution time. 
+
+--------------------------------------------------------------------------
+CONCLUSION
+--------------------------------------------------------------------------
+By applying materialized views and indexes we were able to cut down the speed of the whole query from about 
+27 sec to just a few tenths of a second.
+
+
+
